@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+sequential_ppca/__init__.py
+sequential_ppca/ppca.py
+sequential_ppca/sequential_ppca.py
+sequential_ppca.egg-info/PKG-INFO
+sequential_ppca.egg-info/SOURCES.txt
+sequential_ppca.egg-info/dependency_links.txt
+sequential_ppca.egg-info/requires.txt
+sequential_ppca.egg-info/top_level.txt
+tests/test_ppca.py
+tests/test_sequential_ppca.py
