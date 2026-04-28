@@ -209,7 +209,7 @@ class SequentialSigmoidalFactorAnalysis:
         C = B[:-1].T
         d = B[-1]
         resid = y - Z @ B
-        return C, d, resid
+        return C, d, resid/(np.prod(y.shape))
 
     @staticmethod
     def unpack_theta(theta, K):
@@ -302,6 +302,8 @@ class SequentialSigmoidalFactorAnalysis:
         x00=None,
         obs_noise_floor = 1e-6,
         max_nfev=2000,
+        weight_boundary = 1.,
+        margin = 4.0,
         seed=None,
         verbose=1
     ):
@@ -352,7 +354,15 @@ class SequentialSigmoidalFactorAnalysis:
             x, z = model.simulate_dynamics(T)
             C, d, resid = cls.fit_C_d(y, z)
 
-            return resid.ravel()
+            residuals = [resid.ravel()]
+
+            # Boundary conditions:
+            # x[0] should be <= -margin
+            # x[-1] should be >= +margin
+            residuals.append(weight_boundary * np.maximum(x[0] + margin, 0.0))
+            residuals.append(weight_boundary * np.maximum(margin - x[-1], 0.0))
+
+            return np.concatenate(residuals)
 
         result = least_squares(
             residual_fun,
