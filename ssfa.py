@@ -223,6 +223,76 @@ class SequentialSigmoidalFactorAnalysis:
         return np.concatenate([p, b, x0])
 
     @classmethod
+    def sequential_block_init(cls, y, K, a=0.995, slope=0.15, use_exact_x0=False):
+        """
+        Initialize parameters from a sequential block approximation.
+
+        Split time into K+1 blocks:
+            block 0: no latents active
+            block 1: latent 1 active
+            block 2: latents 1,2 active
+            ...
+            block K: latents 1,...,K active
+
+        Observation initialization:
+            d = mean(block 0)
+            C[:, k] = mean(block k+1) - mean(block k)
+
+        Latent initialization:
+            p = [a, 0, ..., 0]
+            b_i = slope_i
+            x0_i chosen so x_i crosses zero at the corresponding block boundary.
+        """
+        y = np.asarray(y, float)
+        T, N = y.shape
+
+        edges = np.linspace(0, T, K + 2).round().astype(int)
+
+        block_means = np.array([
+            y[edges[k]:edges[k + 1]].mean(axis=0)
+            for k in range(K + 1)
+        ])
+
+        d0 = block_means[0]
+
+        C0 = np.column_stack([
+            block_means[k + 1] - block_means[k]
+            for k in range(K)
+        ])
+
+        onsets = edges[1:K + 1].astype(float)
+
+        slopes = np.asarray(slope, float)
+        if slopes.ndim == 0:
+            slopes = np.full(K, float(slopes))
+        assert slopes.shape == (K,)
+
+        p0 = np.zeros(K)
+        p0[0] = a
+
+        b0 = slopes.copy()
+
+        if use_exact_x0:
+            if np.isclose(a, 1.0):
+                x00 = -b0 * onsets
+            else:
+                x00 = -b0 * (1 - a ** onsets) / ((1 - a) * (a ** onsets))
+        else:
+            x00 = -slopes * onsets
+
+        return {
+            "p": p0,
+            "b": b0,
+            "x0": x00,
+            "C": C0,
+            "d": d0,
+            "onsets": onsets,
+            "slopes": slopes,
+            "edges": edges,
+            "block_means": block_means,
+        }
+
+    @classmethod
     def fit(
         cls,
         y,
@@ -241,14 +311,14 @@ class SequentialSigmoidalFactorAnalysis:
 
         if p0 is None:
             p0 = np.zeros(K)
-            p0[0] = 0.2 + 0.05 * rng.standard_normal()
+            p0[0] = 0.95 
             p0[1:] = 0.0
 
         if b0 is None:
-            b0 = 0.01 * rng.standard_normal(K)
+            b0 = 0.05 * rng.standard_normal(K)
 
         if x00 is None:
-            x00 = -3.0 - 0.5 * np.arange(K)
+            x00 = np.linspace(-10, -5, K)
 
         theta0 = cls.pack_theta(p0, b0, x00)
 
